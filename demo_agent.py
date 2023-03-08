@@ -3,6 +3,9 @@ import atexit
 import getpass
 import requests  # install the package via "pip install requests"
 from collections import defaultdict
+import json
+from main_notebook import *
+
 
 # url of the speakeasy server
 url = 'https://speakeasy.ifi.uzh.ch'
@@ -14,7 +17,7 @@ class DemoBot:
         self.agent_details = self.login(username, password)
         self.session_token = self.agent_details['sessionToken']
         self.chat_state = defaultdict(lambda: {'messages': defaultdict(dict), 'initiated': False, 'my_alias': None})
-
+        main_initialize_fn()
         atexit.register(self.logout)
 
     def listen(self):
@@ -46,7 +49,23 @@ class DemoBot:
 
                                 ##### You should call your agent here and get the response message #####
 
-                                self.post_message(room_id=room_id, session_token=self.session_token, message='Got your message: \'{}\' at {}.'.format(message['message'], self.get_time()))
+                                
+                                questions_df = make_questions_df(message['message'])
+                                process_questions_NLP(questions_df)
+
+                                result = []
+
+                                if questions_df['type'] == 'image':
+                                    result = handle_image_questions(formulated_question_df)
+                                elif questions_df['type'] in ['recommendation', 'reocmmendation_genre']:
+                                    result = handle_recommendation_questions(formulated_question, num_recommendations = 4)
+                                if questions_df['type'] == 'search':
+                                    result = deal_with_KG_query(formulated_question)
+                                
+
+
+
+                                self.post_message(room_id=room_id, session_token=self.session_token, message='The result is : \'{}\'.'.format(result))
             time.sleep(listen_freq)
 
     def login(self, username: str, password: str):
@@ -75,8 +94,12 @@ class DemoBot:
 
 
 if __name__ == '__main__':
-    username = 'demo_bot'
-    password = getpass.getpass('Password of the demo bot:')
+    # username = 'kirat.virmani_bot'
+    with open("./credentials.json", "r") as f:
+        credentials = json.load(f)
+    username = credentials["username"]
+    password = credentials["password"]
+    # password = getpass.getpass('Password of the demo bot:')
     demobot = DemoBot(username, password)
     demobot.listen()
 
